@@ -6,6 +6,9 @@ downloads/*
 run/command_history.txt
 run/usercache.json
 run/options.txt
+run/downloads/log.json
+.gradle/*
+*.DS_Store
 
 # Compiled class file
 *.class
