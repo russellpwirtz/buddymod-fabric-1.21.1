@@ -9,6 +9,7 @@ run/options.txt
 run/downloads/log.json
 .gradle/*
 *.DS_Store
+run/config/fabric/indigo-renderer.properties
 
 # Compiled class file
 *.class
