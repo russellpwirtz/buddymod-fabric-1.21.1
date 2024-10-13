@@ -12,6 +12,8 @@ import net.minecraft.util.Identifier;
 @Environment(EnvType.CLIENT)
 public class EntityTestingClient implements ClientModInitializer {
   public static final EntityModelLayer MODEL_BUDDY_LAYER = new EntityModelLayer(Identifier.of("entitytesting", "buddy"), "main");
+  public static final EntityModelLayer MODEL_BEEDEE_LAYER = new EntityModelLayer(Identifier.of("entitytesting", "beedee"), "main");
+
   @Override
   public void onInitializeClient() {
     /*
@@ -20,7 +22,9 @@ public class EntityTestingClient implements ClientModInitializer {
      * Entity Renderers can also manipulate the model before it renders based on entity context (EndermanEntityRenderer#render).
      */
     EntityRendererRegistry.INSTANCE.register(EntityTesting.BUDDY, BuddyEntityRenderer::new);
+    EntityRendererRegistry.INSTANCE.register(EntityTesting.BEEDEE, BeedeeEntityRenderer::new);
 
     EntityModelLayerRegistry.registerModelLayer(MODEL_BUDDY_LAYER, BuddyEntityModel::getTexturedModelData);
+    EntityModelLayerRegistry.registerModelLayer(MODEL_BEEDEE_LAYER, BeedeeEntityModel::getTexturedModelData);
   }
 }
