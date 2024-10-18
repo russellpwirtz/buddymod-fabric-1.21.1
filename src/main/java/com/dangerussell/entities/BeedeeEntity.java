@@ -3,10 +3,7 @@ package com.dangerussell.entities;
 import com.mojang.logging.LogUtils;
 import net.minecraft.block.*;
 import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.Flutterer;
-import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.*;
 import net.minecraft.entity.ai.AboveGroundTargeting;
 import net.minecraft.entity.ai.NoPenaltySolidTargeting;
 import net.minecraft.entity.ai.NoWaterTargeting;
@@ -28,6 +25,10 @@ import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.mob.PathAwareEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.fluid.Fluid;
+import net.minecraft.inventory.SimpleInventory;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtHelper;
 import net.minecraft.particle.ParticleEffect;
@@ -39,6 +40,7 @@ import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
@@ -49,7 +51,7 @@ import org.slf4j.Logger;
 
 import java.util.*;
 
-public class BeedeeEntity extends PathAwareEntity implements Flutterer {
+public class BeedeeEntity extends PathAwareEntity implements Flutterer, InventoryOwner {
 	public static final int field_28638 = MathHelper.ceil(1.4959966F);
 	private static final TrackedData<Byte> BEE_FLAGS = DataTracker.registerData(BeedeeEntity.class, TrackedDataHandlerRegistry.BYTE);
 	private static final int NEAR_TARGET_FLAG = 2;
@@ -68,9 +70,8 @@ public class BeedeeEntity extends PathAwareEntity implements Flutterer {
 	@Nullable
 	BlockPos playerPos;
 	private int ticksInsideWater;
-	private static final TrackedData<Optional<BlockState>> CARRIED_BLOCK = DataTracker.registerData(
-					BeedeeEntity.class, TrackedDataHandlerRegistry.OPTIONAL_BLOCK_STATE
-	);
+	private final SimpleInventory inventory = new SimpleInventory(8);
+
 	public BeedeeEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
 		super(entityType, world);
 		this.moveControl = new FlightMoveControl(this, 20, true);
@@ -86,16 +87,11 @@ public class BeedeeEntity extends PathAwareEntity implements Flutterer {
 	protected void initDataTracker(DataTracker.Builder builder) {
 		super.initDataTracker(builder);
 		builder.add(BEE_FLAGS, (byte)0);
-		builder.add(CARRIED_BLOCK, Optional.empty());
 	}
 
-	public void setCarriedBlock(@Nullable BlockState state) {
-		this.dataTracker.set(CARRIED_BLOCK, Optional.ofNullable(state));
-	}
-
-	@Nullable
-	public BlockState getCarriedBlock() {
-		return this.dataTracker.get(CARRIED_BLOCK).orElse(null);
+	@Override
+	public SimpleInventory getInventory() {
+		return this.inventory;
 	}
 
 	@Override
@@ -106,7 +102,8 @@ public class BeedeeEntity extends PathAwareEntity implements Flutterer {
 	@Override
 	protected void initGoals() {
 		this.goalSelector.add(0, new StingGoal(this, 1.4F, true));
-		this.goalSelector.add(6, new PickUpBlockGoal(this));
+		this.goalSelector.add(6, new CollectBlockGoal(this, BlockTags.LOGS, 64));
+		this.goalSelector.add(6, new PlaceBlockGoal(this));
 		this.goalSelector.add(6, new MoveToPlayerGoal());
 		this.goalSelector.add(7, new GrowCropsGoal());
 		this.goalSelector.add(8, new BeeWanderAroundGoal());
@@ -118,6 +115,12 @@ public class BeedeeEntity extends PathAwareEntity implements Flutterer {
 	public void writeCustomDataToNbt(NbtCompound nbt) {
 		super.writeCustomDataToNbt(nbt);
 
+		try {
+			this.writeInventory(nbt, this.getRegistryManager());
+		} catch (Exception e) {
+			LOGGER.error("Unable to save inventory for Beedee", e);
+		}
+
 		if (this.hasPlayer()) {
 			nbt.put("player_pos", NbtHelper.fromBlockPos(this.getPlayerPos()));
 		}
@@ -128,20 +131,20 @@ public class BeedeeEntity extends PathAwareEntity implements Flutterer {
 		nbt.putInt("CropsGrownSincePollination", this.cropsGrownSincePollination);
 	}
 
-	static class PickUpBlockGoal extends Goal {
+	static class CollectBlockGoal extends Goal {
 		private final BeedeeEntity beedee;
+		private final TagKey<Block> blocksToCollect;
 
-		public PickUpBlockGoal(BeedeeEntity beedee) {
+		public CollectBlockGoal(BeedeeEntity beedee, TagKey<Block> blocksToCollect, int maxPerStack) {
 			this.beedee = beedee;
+			this.blocksToCollect = blocksToCollect;
 		}
 
 		@Override
 		public boolean canStart() {
-			if (this.beedee.getCarriedBlock() != null) {
-				return false;
-			} else {
-				return true;
-			}
+      return beedee.getInventory().heldStacks.stream().anyMatch(itemStack ->
+				itemStack.getName().getString().equalsIgnoreCase("Air")
+			);
 		}
 
 		@Override
@@ -160,19 +163,93 @@ public class BeedeeEntity extends PathAwareEntity implements Flutterer {
 			BlockState blockState = world.getBlockState(blockHitResult.getBlockPos());
 			LOGGER.debug("See {} at [{},{},{}]", blockState.toString(), blockHitResult.getBlockPos().getX(), blockHitResult.getBlockPos().getY(), blockHitResult.getBlockPos().getZ());
 
-			if (blockState.isIn(BlockTags.LOGS)) {
-				LOGGER.debug("Found {}", blockState.getBlock().toString());
+			if (blockState.isIn(blocksToCollect)) {
+				LOGGER.info("Found {}", blockState.getBlock().toString());
+				Item convertedToItem = blockState.getBlock().asItem();
 				world.removeBlock(blockHitResult.getBlockPos(), false);
 				world.emitGameEvent(GameEvent.BLOCK_DESTROY, blockHitResult.getBlockPos(), GameEvent.Emitter.of(this.beedee, blockState));
-				this.beedee.setCarriedBlock(blockState.getBlock().getDefaultState());
+				try {
+					ItemStack stackToAdd = convertedToItem.getDefaultStack();
+					LOGGER.info("Adding {} to {} stack", stackToAdd.getCount(), stackToAdd.getItem().toString());
+					this.beedee.inventory.addStack(stackToAdd);
+				} catch (Exception e) {
+					LOGGER.error("Couldn't addStack: ", e);
+				}
 			}
+		}
+	}
+
+	static class PlaceBlockGoal extends Goal {
+		private final BeedeeEntity beedee;
+
+		public PlaceBlockGoal(BeedeeEntity beedee) {
+			this.beedee = beedee;
+		}
+
+		@Override
+		public boolean canStart() {
+			int itemsCount = beedee.getInventory().heldStacks.stream()
+							.filter(itemStack -> !itemStack.getName().getString().equalsIgnoreCase("Air"))
+							.peek(itemStack -> LOGGER.info("Inventory item: {}, count: {}", itemStack.getItem().toString(), itemStack.getCount()))
+							.mapToInt(ItemStack::getCount)
+							.sum();
+
+			if (itemsCount > 0) {
+				LOGGER.info("Total items count: {}", itemsCount);
+			}
+
+			return itemsCount > 0;
+		}
+
+		@Override
+		public void tick() {
+			Random random = this.beedee.getRandom();
+			World world = this.beedee.getWorld();
+			int i = MathHelper.floor(this.beedee.getX() + 1.0 + random.nextDouble() * 2.0);
+			int j = MathHelper.floor(this.beedee.getY() + random.nextDouble() * 2.0);
+			int k = MathHelper.floor(this.beedee.getZ() + 1.0 + random.nextDouble() * 2.0);
+
+			BlockPos blockPos = new BlockPos(i, j, k);
+			BlockState blockState = world.getBlockState(blockPos);
+
+			BlockPos blockPos2 = blockPos.down();
+			BlockState blockState2 = world.getBlockState(blockPos2);
+			ItemStack itemStack = this.beedee.inventory.removeItem(
+							this.beedee.getInventory()
+											.heldStacks
+											.stream()
+											.filter(itemStack1 -> !itemStack1.getItem().getName().getString().equals("Air"))
+											.findFirst().get()
+											.getItem(), 1);
+
+			LOGGER.info("Found item to place: {}", itemStack.getName().getString());
+			if (!itemStack.isEmpty() && itemStack.getItem() instanceof BlockItem blockItem) {
+				BlockState blockState3 = blockItem.getBlock().getDefaultState();
+				if (this.canPlaceOn(world, blockPos, blockState3, blockState, blockState2, blockPos2)) {
+					world.setBlockState(blockPos, blockState3);
+					world.emitGameEvent(GameEvent.BLOCK_PLACE, blockPos, GameEvent.Emitter.of(this.beedee, blockState3));
+					LOGGER.info("Placed item: {}", itemStack.getName().getString());
+				} else {
+					LOGGER.info("Couldn't place item: {}", itemStack.getName().getString());
+				}
+			}
+		}
+
+		private boolean canPlaceOn(World world, BlockPos posAbove, BlockState carriedState, BlockState stateAbove, BlockState state, BlockPos pos) {
+			return stateAbove.isAir()
+							&& !state.isAir()
+							&& !state.isOf(Blocks.BEDROCK)
+							&& state.isFullCube(world, pos)
+							&& carriedState.canPlaceAt(world, posAbove)
+							&& world.getOtherEntities(this.beedee, Box.from(Vec3d.of(posAbove))).isEmpty();
 		}
 	}
 
 	@Override
 	public void readCustomDataFromNbt(NbtCompound nbt) {
-		this.playerPos = (BlockPos)NbtHelper.toBlockPos(nbt, "player_pos").orElse(null);
+		this.playerPos = NbtHelper.toBlockPos(nbt, "player_pos").orElse(null);
 		super.readCustomDataFromNbt(nbt);
+		this.readInventory(nbt, this.getRegistryManager());
 		this.setHasNectar(nbt.getBoolean("HasNectar"));
 		this.setHasStung(nbt.getBoolean("HasStung"));
 		this.ticksSincePollination = nbt.getInt("TicksSincePollination");
