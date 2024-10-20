@@ -103,7 +103,7 @@ public class CreateStructureGoal extends Goal {
                   centerZ + blockCoord.position[2]
           );
 
-          Identifier blockId = Identifier.of(blockCoord.block);
+          Identifier blockId = Identifier.of(blockCoord.block.contains(":") ? blockCoord.block : "minecraft:" + blockCoord.block);
           Block blockInstance = Registries.BLOCK.get(blockId);
           BlockState newBlockState = blockInstance.getDefaultState();
           if (canPlaceBlock(serverWorld, targetPos)) {
