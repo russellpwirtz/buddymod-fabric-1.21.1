@@ -29,6 +29,7 @@ import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtHelper;
 import net.minecraft.particle.ParticleEffect;
@@ -38,6 +39,7 @@ import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
@@ -101,14 +103,14 @@ public class BeedeeEntity extends PathAwareEntity implements Flutterer, Inventor
 
 	@Override
 	protected void initGoals() {
-		this.goalSelector.add(0, new StingGoal(this, 1.4F, true));
+//		this.goalSelector.add(0, new StingGoal(this, 1.4F, true));
 		this.goalSelector.add(6, new CollectBlockGoal(this, BlockTags.LOGS, 64));
 		this.goalSelector.add(6, new PlaceBlockGoal(this));
 		this.goalSelector.add(6, new MoveToPlayerGoal());
 		this.goalSelector.add(7, new GrowCropsGoal());
 		this.goalSelector.add(8, new BeeWanderAroundGoal());
 		this.goalSelector.add(9, new SwimGoal(this));
-		this.targetSelector.add(2, new StingTargetGoal(this));
+//		this.targetSelector.add(2, new StingTargetGoal(this));
 	}
 
 	@Override
@@ -143,7 +145,7 @@ public class BeedeeEntity extends PathAwareEntity implements Flutterer, Inventor
 		@Override
 		public boolean canStart() {
       return beedee.getInventory().heldStacks.stream().anyMatch(itemStack ->
-				itemStack.getName().getString().equalsIgnoreCase("Air")
+				itemStack.getItem().equals(Items.AIR)
 			);
 		}
 
@@ -163,7 +165,8 @@ public class BeedeeEntity extends PathAwareEntity implements Flutterer, Inventor
 			BlockState blockState = world.getBlockState(blockHitResult.getBlockPos());
 			LOGGER.debug("See {} at [{},{},{}]", blockState.toString(), blockHitResult.getBlockPos().getX(), blockHitResult.getBlockPos().getY(), blockHitResult.getBlockPos().getZ());
 
-			if (blockState.isIn(blocksToCollect)) {
+			if (blockState.isIn(blocksToCollect) && this.beedee.player != null
+							&& !this.beedee.player.getStackInHand(Hand.OFF_HAND).getItem().equals(blockState.getBlock().asItem())) {
 				LOGGER.info("Found {}", blockState.getBlock().toString());
 				Item convertedToItem = blockState.getBlock().asItem();
 				world.removeBlock(blockHitResult.getBlockPos(), false);
@@ -214,13 +217,20 @@ public class BeedeeEntity extends PathAwareEntity implements Flutterer, Inventor
 
 			BlockPos blockPos2 = blockPos.down();
 			BlockState blockState2 = world.getBlockState(blockPos2);
-			ItemStack itemStack = this.beedee.inventory.removeItem(
-							this.beedee.getInventory()
+
+			if (this.beedee.player == null) {
+				return;
+			}
+
+			ItemStack inHand = this.beedee.player.getStackInHand(Hand.OFF_HAND);
+			LOGGER.info("In player's offhand: {}", inHand.getItem().getName());
+
+			ItemStack itemStack = this.beedee.getInventory()
 											.heldStacks
 											.stream()
-											.filter(itemStack1 -> !itemStack1.getItem().getName().getString().equals("Air"))
-											.findFirst().get()
-											.getItem(), 1);
+											.filter(itemStack1 -> !itemStack1.getItem().equals(Items.AIR))
+											.filter(itemStack1 -> itemStack1.getItem().equals(inHand.getItem()))
+											.findFirst().orElse(ItemStack.EMPTY);
 
 			LOGGER.info("Found item to place: {}", itemStack.getName().getString());
 			if (!itemStack.isEmpty() && itemStack.getItem() instanceof BlockItem blockItem) {
@@ -229,6 +239,7 @@ public class BeedeeEntity extends PathAwareEntity implements Flutterer, Inventor
 					world.setBlockState(blockPos, blockState3);
 					world.emitGameEvent(GameEvent.BLOCK_PLACE, blockPos, GameEvent.Emitter.of(this.beedee, blockState3));
 					LOGGER.info("Placed item: {}", itemStack.getName().getString());
+					this.beedee.getInventory().removeItem(itemStack.getItem(), 1);
 				} else {
 					LOGGER.info("Couldn't place item: {}", itemStack.getName().getString());
 				}
