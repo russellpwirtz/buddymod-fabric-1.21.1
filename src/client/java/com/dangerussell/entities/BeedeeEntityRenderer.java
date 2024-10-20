@@ -8,8 +8,8 @@ import net.minecraft.util.Identifier;
 
 @Environment(EnvType.CLIENT)
 public class BeedeeEntityRenderer extends MobEntityRenderer<BeedeeEntity, BeedeeEntityModel<BeedeeEntity>> {
-	private static final Identifier PASSIVE_TEXTURE = Identifier.of("entitytesting", "textures/entity/buddy/beedee.png");
-	private static final Identifier NECTAR_TEXTURE = Identifier.of("entitytesting", "textures/entity/bee/beedee_loaded.png");
+	private static final Identifier PASSIVE_TEXTURE = Identifier.of("entitytesting", "textures/entity/beedee/beedee.png");
+	private static final Identifier NECTAR_TEXTURE = Identifier.of("entitytesting", "textures/entity/beedee/beedee_loaded.png");
 
 	public BeedeeEntityRenderer(EntityRendererFactory.Context context) {
 		super(context, new BeedeeEntityModel<>(context.getPart(EntityTestingClient.MODEL_BEEDEE_LAYER)), 0.4F);
