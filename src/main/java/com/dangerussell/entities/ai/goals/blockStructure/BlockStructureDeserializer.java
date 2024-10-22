@@ -32,11 +32,6 @@ public abstract class BlockStructureDeserializer {
       return false;
     }
 
-    if (structureMap.origin == null || structureMap.origin.length != 3) {
-      LOGGER.error("Structure origin must be an array of exactly 3 integers (x, y, z)");
-      return false;
-    }
-
     if (structureMap.blocks == null || structureMap.blocks.isEmpty()) {
       LOGGER.error("Structure blocks list is empty or null");
       return false;

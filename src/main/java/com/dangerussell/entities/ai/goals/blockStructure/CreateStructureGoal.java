@@ -29,7 +29,8 @@ public class CreateStructureGoal extends Goal {
   private static final int COOLDOWN_TICKS = 5;
   private BlockPos startPosition;
 
-  private static final String BEEHIVE_FILE = "assets/entitytesting/structures/beehive_structure.json";
+//  private static final String BEEHIVE_FILE = "assets/entitytesting/structures/beehive_structure.json";
+  private static final String BEEHIVE_FILE = "assets/entitytesting/structures/tower01.bo2";
 
   public CreateStructureGoal(MobEntity mob, PlayerEntity player) {
     this.mob = mob;
@@ -102,7 +103,8 @@ public class CreateStructureGoal extends Goal {
   private BlockStructure getStructureDefinition(String fileName) throws IOException {
     try (InputStream inputStream = CreateStructureGoal.class.getClassLoader().getResourceAsStream(fileName)) {
       if (inputStream != null) {
-        return new JsonBlockStructureDeserializer().deserialize(inputStream);
+//        return new JsonBlockStructureDeserializer().deserialize(inputStream);
+        return new Bo2BlockStructureDeserializer().deserialize(inputStream);
       } else {
         LOGGER.error("Could not find structure resource");
         throw new IOException("Unable to deserialize structure");
