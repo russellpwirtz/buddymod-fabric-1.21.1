@@ -30,6 +30,7 @@ public class CreateStructureGoal extends Goal {
   private int currentBlockIndex = 0;
   private int blockPlacementCooldown = 0;
   private static final int COOLDOWN_TICKS = 5;
+  private BlockPos startPosition;
 
   public CreateStructureGoal(MobEntity mob, PlayerEntity player) {
     this.mob = mob;
@@ -87,20 +88,18 @@ public class CreateStructureGoal extends Goal {
     if (this.mob.getWorld() instanceof ServerWorld serverWorld) {
       if (!this.isRunning) {
         this.isRunning = true;
+        this.startPosition = this.mob.getBlockPos();
         this.blockPlacementCooldown = 0;
+        this.currentBlockIndex = 0;
       }
 
       if (this.blockPlacementCooldown == 0) {
         if (currentBlockIndex < structureDefinition.blocks.size()) {
           StructuredBlockGrid.BlockCoordinate blockCoord = structureDefinition.blocks.get(currentBlockIndex);
-          int centerX = (int) this.mob.getX() + structureDefinition.origin[0];
-          int startY = (int) this.mob.getY() + structureDefinition.origin[1];
-          int centerZ = (int) this.mob.getZ() + structureDefinition.origin[2];
-
           BlockPos targetPos = new BlockPos(
-                  centerX + blockCoord.position[0],
-                  startY + blockCoord.position[1],
-                  centerZ + blockCoord.position[2]
+                  this.startPosition.getX() + structureDefinition.origin[0] + blockCoord.position[0],
+                  this.startPosition.getY() + structureDefinition.origin[1] + blockCoord.position[1],
+                  this.startPosition.getZ() + structureDefinition.origin[2] + blockCoord.position[2]
           );
 
           Identifier blockId = Identifier.of(blockCoord.block.contains(":") ? blockCoord.block : "minecraft:" + blockCoord.block);
