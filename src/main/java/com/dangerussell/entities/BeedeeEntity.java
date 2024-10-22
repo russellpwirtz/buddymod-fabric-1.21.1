@@ -1,6 +1,6 @@
 package com.dangerussell.entities;
 
-import com.dangerussell.entities.ai.goals.CreateStructureGoal;
+import com.dangerussell.entities.ai.goals.blockStructure.CreateStructureGoal;
 import com.mojang.logging.LogUtils;
 import net.minecraft.block.*;
 import net.minecraft.enchantment.EnchantmentHelper;
