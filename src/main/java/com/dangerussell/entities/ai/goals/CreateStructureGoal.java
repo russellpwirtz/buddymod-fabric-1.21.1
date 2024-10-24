@@ -1,5 +1,7 @@
-package com.dangerussell.entities.ai.goals.blockStructure;
+package com.dangerussell.entities.ai.goals;
 
+import com.dangerussell.blockStructure.BlockStructure;
+import com.dangerussell.blockStructure.Bo2BlockStructureDeserializer;
 import com.mojang.logging.LogUtils;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -30,7 +32,8 @@ public class CreateStructureGoal extends Goal {
   private BlockPos startPosition;
 
 //  private static final String BEEHIVE_FILE = "assets/entitytesting/structures/beehive_structure.json";
-  private static final String BEEHIVE_FILE = "assets/entitytesting/structures/tower01.bo2";
+//  private static final String BEEHIVE_FILE = "assets/entitytesting/structures/tower01.bo2";
+  private static final String BEEHIVE_FILE = "assets/entitytesting/structures/23.bo2";
 
   public CreateStructureGoal(MobEntity mob, PlayerEntity player) {
     this.mob = mob;
@@ -63,9 +66,10 @@ public class CreateStructureGoal extends Goal {
           this.structureDefinition = getStructureDefinition(BEEHIVE_FILE);
         }
 
-        if (this.blockPlacementCooldown == 0) {
-          if (currentBlockIndex < structureDefinition.blocks.size()) {
-            BlockStructure.BlockCoordinate coord = structureDefinition.blocks.get(currentBlockIndex);
+        if (this.player != null && this.player.isCreative()) {
+          // Build the entire structure in 1 tick if in Creative mode
+          for (int i = 0; i < structureDefinition.blocks.size(); i++) {
+            BlockStructure.BlockCoordinate coord = structureDefinition.blocks.get(i);
             BlockPos targetPos = new BlockPos(
                     this.startPosition.getX() + structureDefinition.origin[0] + coord.position[0],
                     this.startPosition.getY() + structureDefinition.origin[1] + coord.position[1],
@@ -81,18 +85,43 @@ public class CreateStructureGoal extends Goal {
             } else {
               LOGGER.info("Could not place block {} at {}", coord.block, targetPos);
             }
-            currentBlockIndex++;
-
-            if (currentBlockIndex >= structureDefinition.blocks.size()) {
-              this.isRunning = false;
-              this.blockPlacementCooldown = 0;
-              this.currentBlockIndex = 0;
-              LOGGER.info("Structure creation completed");
-            }
           }
-          this.blockPlacementCooldown = COOLDOWN_TICKS;
+          this.isRunning = false;
+          this.blockPlacementCooldown = 0;
+          this.currentBlockIndex = 0;
+          LOGGER.info("Structure creation completed");
         } else {
-          this.blockPlacementCooldown--;
+          if (this.blockPlacementCooldown == 0) {
+            if (currentBlockIndex < structureDefinition.blocks.size()) {
+              BlockStructure.BlockCoordinate coord = structureDefinition.blocks.get(currentBlockIndex);
+              BlockPos targetPos = new BlockPos(
+                      this.startPosition.getX() + structureDefinition.origin[0] + coord.position[0],
+                      this.startPosition.getY() + structureDefinition.origin[1] + coord.position[1],
+                      this.startPosition.getZ() + structureDefinition.origin[2] + coord.position[2]
+              );
+
+              Identifier blockId = Identifier.of(coord.block.contains(":") ? coord.block : "minecraft:" + coord.block);
+              Block blockInstance = Registries.BLOCK.get(blockId);
+              BlockState newBlockState = blockInstance.getDefaultState();
+              if (canPlaceBlock(serverWorld, targetPos)) {
+                serverWorld.setBlockState(targetPos, newBlockState, 3);
+                LOGGER.info("Placed block {} at {}", coord.block, targetPos);
+              } else {
+                LOGGER.info("Could not place block {} at {}", coord.block, targetPos);
+              }
+              currentBlockIndex++;
+
+              if (currentBlockIndex >= structureDefinition.blocks.size()) {
+                this.isRunning = false;
+                this.blockPlacementCooldown = 0;
+                this.currentBlockIndex = 0;
+                LOGGER.info("Structure creation completed");
+              }
+            }
+            this.blockPlacementCooldown = COOLDOWN_TICKS;
+          } else {
+            this.blockPlacementCooldown--;
+          }
         }
       }
     } catch (Exception e) {

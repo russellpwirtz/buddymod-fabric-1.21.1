@@ -1,4 +1,4 @@
-package com.dangerussell.entities.ai.goals.blockStructure;
+package com.dangerussell.blockStructure;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -13,6 +13,7 @@ public class Bo2BlockStructureDeserializer extends BlockStructureDeserializer {
   public BlockStructure deserialize(InputStream inputStream) throws IOException {
     BlockStructure blockStructure = new BlockStructure();
     blockStructure.name = "Unknown Structure";
+    BlockMapping blockMapping = new Bo2BlockMapping();
 
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
       String line;
@@ -45,8 +46,13 @@ public class Bo2BlockStructureDeserializer extends BlockStructureDeserializer {
 
         BlockStructure.BlockCoordinate block = new BlockStructure.BlockCoordinate();
         block.position = new int[]{Integer.parseInt(coords[0]), Integer.parseInt(coords[2]), Integer.parseInt(coords[1])};
-        block.block = "dirt"; // for now
+        String blockType = parts[1];
+        // TODO: properties based on decimal value
+        if (blockType.contains(".")) {
+          blockType = blockType.split("\\.")[0];
+        }
 
+        block.block = blockMapping.getBlockName(blockType);
         blocks.add(block);
       }
 

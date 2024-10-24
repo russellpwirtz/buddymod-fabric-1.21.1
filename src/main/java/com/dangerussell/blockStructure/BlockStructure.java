@@ -1,4 +1,4 @@
-package com.dangerussell.entities.ai.goals.blockStructure;
+package com.dangerussell.blockStructure;
 import java.util.List;
 
 public class BlockStructure {
