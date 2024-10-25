@@ -256,7 +256,7 @@ public class CreateStructureGoal extends Goal {
   }
 
   private static BlockState setPaneFacing(String key, BlockState blockState, Map<String, Object> variants) {
-d    return switch (key) {
+    return switch (key) {
       case "east" -> blockState.with(PaneBlock.EAST, (Boolean) variants.get(key));
       case "west" -> blockState.with(PaneBlock.WEST, (Boolean) variants.get(key));
       case "north" -> blockState.with(PaneBlock.NORTH, (Boolean) variants.get(key));
