@@ -5,6 +5,8 @@ import com.dangerussell.blockStructure.Bo2BlockStructureDeserializer;
 import com.mojang.logging.LogUtils;
 import net.minecraft.block.*;
 import net.minecraft.block.enums.BlockHalf;
+import net.minecraft.block.enums.DoorHinge;
+import net.minecraft.block.enums.DoubleBlockHalf;
 import net.minecraft.block.enums.SlabType;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.ai.goal.Goal;
@@ -26,10 +28,6 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
-import static net.minecraft.block.DoorBlock.OPEN;
-import static net.minecraft.block.StairsBlock.FACING;
-import static net.minecraft.block.StairsBlock.HALF;
-
 public class CreateStructureGoal extends Goal {
   private final MobEntity mob;
   private final PlayerEntity player;
@@ -40,11 +38,13 @@ public class CreateStructureGoal extends Goal {
   private int blockPlacementCooldown = 0;
   private static final int COOLDOWN_TICKS = 5;
   private BlockPos startPosition;
+  private static final String BASE_ASSET_DIR = "assets/entitytesting/structures/";
 
-  //  private static final String BEEHIVE_FILE = "assets/entitytesting/structures/beehive_structure.json";
-  private static final String BEEHIVE_FILE = "assets/entitytesting/structures/tower01.bo2";
-//  private static final String BEEHIVE_FILE = "assets/entitytesting/structures/23.bo2";
-//  private static final String BEEHIVE_FILE = "assets/entitytesting/structures/2582.bo2";
+  //  private static final String STRUCTURE_FILE = BASE_ASSET_DIR + "beehive_structure.json";
+    private static final String STRUCTURE_FILE = BASE_ASSET_DIR + "5_modern-tower.bo2";
+//  private static final String STRUCTURE_FILE = BASE_ASSET_DIR + "3_agility-arena.bo2";
+//  private static final String STRUCTURE_FILE = BASE_ASSET_DIR + "23_small-house.bo2";
+//    private static final String STRUCTURE_FILE = BASE_ASSET_DIR + "2582_jar9-castle.bo2";
 
   public CreateStructureGoal(MobEntity mob, PlayerEntity player) {
     this.mob = mob;
@@ -74,7 +74,7 @@ public class CreateStructureGoal extends Goal {
           this.startPosition = this.mob.getBlockPos();
           this.blockPlacementCooldown = 0;
           this.currentBlockIndex = 0;
-          this.structureDefinition = getStructureDefinition(BEEHIVE_FILE);
+          this.structureDefinition = getStructureDefinition(STRUCTURE_FILE);
         }
 
         if (this.player != null && this.player.isCreative()) {
@@ -87,6 +87,10 @@ public class CreateStructureGoal extends Goal {
                     this.startPosition.getZ() + structureDefinition.origin[2] + coord.position[2]
             );
 
+            if (coord.block == null ) {
+              LOGGER.warn("Null block");
+              continue;
+            }
             String blockName = coord.block.split("\\[")[0];
             String blockVariant = coord.block.split("\\[").length < 2
                     ? "0"
@@ -107,10 +111,7 @@ public class CreateStructureGoal extends Goal {
               }
             });
 
-            LOGGER.info("Full Block: " + coord.block);
-            LOGGER.info("Block name: " + blockName);
-            LOGGER.info("Block variant: " + blockVariant);
-            LOGGER.info("Block variants: " + variants);
+            LOGGER.info("Block name: {}, variant: {}", blockName, blockVariant);
             Identifier blockId = Identifier.of(blockName);
             Block blockInstance = Registries.BLOCK.get(blockId);
 
@@ -126,7 +127,8 @@ public class CreateStructureGoal extends Goal {
                 currentBlock = setFacingValues(key, variants, currentBlock);
                 currentBlock = setHalfValues(key, variants, currentBlock);
                 currentBlock = setOpenValues(key, variants, currentBlock);
-//            facing=east,half=lower,hinge=left,open=false,powered=false
+                currentBlock = setPoweredValues(key, variants, currentBlock);
+                currentBlock = setHingeValues(key, variants, currentBlock);
 //            {variant=dirt, snowy=false}
 //            {variant=stone}
 //            {variant=stonebrick}
@@ -137,7 +139,6 @@ public class CreateStructureGoal extends Goal {
             } catch (Exception e) {
               LOGGER.error("Unable to set variant: ", e);
             }
-
 
             if (canPlaceBlock(serverWorld, targetPos)) {
               serverWorld.setBlockState(targetPos, currentBlock, 3);
@@ -192,28 +193,73 @@ public class CreateStructureGoal extends Goal {
   }
 
   private static BlockState setHalfValues(String key, Map<String, Object> variants, BlockState blockState) {
+    String registryKey = blockState.getBlock().getRegistryEntry().getIdAsString();
     if (key.equals("half")) {
-      if (blockState.getBlock() instanceof SlabBlock) {
+      if (registryKey.endsWith("slab") || registryKey.endsWith("slab2")) {
         return switch ((String) variants.get(key)) {
           case "top" -> blockState.with(Properties.SLAB_TYPE, SlabType.TOP);
           case "bottom" -> blockState.with(Properties.SLAB_TYPE, SlabType.BOTTOM);
           default -> blockState;
         };
-      } else {
+      } else if (registryKey.endsWith("trapdoor")) {
         return switch ((String) variants.get(key)) {
-          case "top" -> blockState.with(HALF, BlockHalf.TOP);
-          case "bottom" -> blockState.with(HALF, BlockHalf.BOTTOM);
+          case "top" -> blockState.with(TrapdoorBlock.HALF, BlockHalf.TOP);
+          case "bottom" -> blockState.with(TrapdoorBlock.HALF, BlockHalf.BOTTOM);
+          default -> blockState;
+        };
+      } else if (registryKey.endsWith("door")) {
+        return switch ((String) variants.get(key)) {
+          case "upper" -> blockState.with(DoorBlock.HALF, DoubleBlockHalf.UPPER);
+          case "lower" -> blockState.with(DoorBlock.HALF, DoubleBlockHalf.LOWER);
+          default -> blockState;
+        };
+      } else if (registryKey.endsWith("stairs")) {
+        return switch ((String) variants.get(key)) {
+          case "top" -> blockState.with(StairsBlock.HALF, BlockHalf.TOP);
+          case "bottom" -> blockState.with(StairsBlock.HALF, BlockHalf.BOTTOM);
           default -> blockState;
         };
       }
-    } else {
-      return blockState;
     }
+
+    return blockState;
   }
 
   private static BlockState setOpenValues(String key, Map<String, Object> variants, BlockState blockState) {
+    String registryKey = blockState.getBlock().getRegistryEntry().getIdAsString();
     if (key.equals("open")) {
-      blockState = blockState.with(OPEN, (Boolean) variants.get(key));
+      if (registryKey.endsWith("trapdoor")) {
+        return blockState.with(TrapdoorBlock.OPEN, (Boolean) variants.get(key));
+      } else if (registryKey.endsWith("door")) {
+        blockState = blockState.with(DoorBlock.OPEN, (Boolean) variants.get(key));
+      }
+    }
+    return blockState;
+  }
+
+  private static BlockState setPoweredValues(String key, Map<String, Object> variants, BlockState blockState) {
+    String registryKey = blockState.getBlock().getRegistryEntry().getIdAsString();
+    if (key.equals("powered")) {
+      if (registryKey.endsWith("iron_door")) {
+        blockState = blockState.with(DoorBlock.POWERED, (Boolean) variants.get(key));
+      } else if (registryKey.endsWith("pressure_plate")) {
+        blockState = blockState.with(PressurePlateBlock.POWERED, (Boolean) variants.get(key));
+      }
+      // TODO Rail
+    }
+    return blockState;
+  }
+
+  private static BlockState setHingeValues(String key, Map<String, Object> variants, BlockState blockState) {
+    String registryKey = blockState.getBlock().getRegistryEntry().getIdAsString();
+    if (key.equals("hinge")) {
+      if (registryKey.endsWith("door")) {
+        if (variants.get(key).equals("left")) {
+          blockState = blockState.with(DoorBlock.HINGE, DoorHinge.LEFT);
+        } else if (variants.get(key).equals("right")) {
+          blockState = blockState.with(DoorBlock.HINGE, DoorHinge.RIGHT);
+        }
+      }
     }
     return blockState;
   }
@@ -223,10 +269,14 @@ public class CreateStructureGoal extends Goal {
     if (key.equals("facing")) {
       if (registryKey.endsWith("_stairs")) {
         return setStairsFacing(key, blockState, variants);
+      } else if (registryKey.endsWith("trapdoor")) {
+        return setTrapdoorFacing(key, blockState, variants);
       } else if (registryKey.endsWith("_door")) {
         return setDoorFacing(key, blockState, variants);
       } else if (registryKey.endsWith("wall_sign")) {
         return setSignFacing(key, blockState, variants);
+      } else if (registryKey.endsWith("ladder")) {
+        return setLadderFacing(key, blockState, variants);
       }
     } else if (registryKey.endsWith("_pane") && Arrays.asList("north", "west", "south", "east").contains(key)) {
       return setPaneFacing(key, blockState, variants);
@@ -237,20 +287,30 @@ public class CreateStructureGoal extends Goal {
 
   private static BlockState setStairsFacing(String key, BlockState blockState, Map<String, Object> variants) {
     return switch ((String)variants.get(key)) {
-      case "east" -> blockState.with(FACING, Direction.EAST);
-      case "west" -> blockState.with(FACING, Direction.WEST);
-      case "south" -> blockState.with(FACING, Direction.SOUTH);
-      case "north" -> blockState.with(FACING, Direction.NORTH);
+      case "east" -> blockState.with(StairsBlock.FACING, Direction.EAST);
+      case "west" -> blockState.with(StairsBlock.FACING, Direction.WEST);
+      case "south" -> blockState.with(StairsBlock.FACING, Direction.SOUTH);
+      case "north" -> blockState.with(StairsBlock.FACING, Direction.NORTH);
       default -> blockState;
     };
   }
 
   private static BlockState setDoorFacing(String key, BlockState blockState, Map<String, Object> variants) {
     return switch ((String)variants.get(key)) {
-      case "east" -> blockState.with(DoorBlock.FACING, Direction.EAST);
-      case "west" -> blockState.with(DoorBlock.FACING, Direction.WEST);
-      case "south" -> blockState.with(DoorBlock.FACING, Direction.SOUTH);
-      case "north" -> blockState.with(DoorBlock.FACING, Direction.NORTH);
+      case "east" -> blockState.with(HorizontalFacingBlock.FACING, Direction.EAST);
+      case "west" -> blockState.with(HorizontalFacingBlock.FACING, Direction.WEST);
+      case "south" -> blockState.with(HorizontalFacingBlock.FACING, Direction.SOUTH);
+      case "north" -> blockState.with(HorizontalFacingBlock.FACING, Direction.NORTH);
+      default -> blockState;
+    };
+  }
+
+  private static BlockState setTrapdoorFacing(String key, BlockState blockState, Map<String, Object> variants) {
+    return switch ((String)variants.get(key)) {
+      case "east" -> blockState.with(TrapdoorBlock.FACING, Direction.EAST);
+      case "west" -> blockState.with(TrapdoorBlock.FACING, Direction.WEST);
+      case "south" -> blockState.with(TrapdoorBlock.FACING, Direction.SOUTH);
+      case "north" -> blockState.with(TrapdoorBlock.FACING, Direction.NORTH);
       default -> blockState;
     };
   }
@@ -267,10 +327,20 @@ public class CreateStructureGoal extends Goal {
 
   private static BlockState setSignFacing(String key, BlockState blockState, Map<String, Object> variants) {
     return switch ((String)variants.get(key)) {
-      case "north" -> blockState.with(FACING, Direction.NORTH);
-      case "west" -> blockState.with(FACING, Direction.WEST);
-      case "south" -> blockState.with(FACING, Direction.SOUTH);
-      case "east" -> blockState.with(FACING, Direction.EAST);
+      case "north" -> blockState.with(WallHangingSignBlock.FACING, Direction.NORTH);
+      case "west" -> blockState.with(WallHangingSignBlock.FACING, Direction.WEST);
+      case "south" -> blockState.with(WallHangingSignBlock.FACING, Direction.SOUTH);
+      case "east" -> blockState.with(WallHangingSignBlock.FACING, Direction.EAST);
+      default -> blockState;
+    };
+  }
+
+  private static BlockState setLadderFacing(String key, BlockState blockState, Map<String, Object> variants) {
+    return switch ((String)variants.get(key)) {
+      case "north" -> blockState.with(LadderBlock.FACING, Direction.NORTH);
+      case "west" -> blockState.with(LadderBlock.FACING, Direction.WEST);
+      case "south" -> blockState.with(LadderBlock.FACING, Direction.SOUTH);
+      case "east" -> blockState.with(LadderBlock.FACING, Direction.EAST);
       default -> blockState;
     };
   }
