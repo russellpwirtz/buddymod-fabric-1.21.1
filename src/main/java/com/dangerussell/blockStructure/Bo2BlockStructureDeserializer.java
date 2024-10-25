@@ -46,13 +46,11 @@ public class Bo2BlockStructureDeserializer extends BlockStructureDeserializer {
 
         BlockStructure.BlockCoordinate block = new BlockStructure.BlockCoordinate();
         block.position = new int[]{Integer.parseInt(coords[0]), Integer.parseInt(coords[2]), Integer.parseInt(coords[1])};
-        String blockType = parts[1];
-        // TODO: properties based on decimal value
-        if (blockType.contains(".")) {
-          blockType = blockType.split("\\.")[0];
-        }
+        String blockType = parts[1].split("\\.")[0];
+        String blockVariant = parts[1].split("\\.").length < 2 ? "0" : parts[1].split("\\.")[1];
+        String key = blockType + ":" + blockVariant;
 
-        block.block = blockMapping.getBlockName(blockType);
+        block.block = blockMapping.getBlockName(key);
         blocks.add(block);
       }
 
